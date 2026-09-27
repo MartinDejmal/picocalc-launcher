@@ -79,29 +79,7 @@ run = run_script
 
 def _title_from_filename(filename):
     name = filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-    # MicroPython's compact ``str`` implementation does not provide title().
-    # Build a readable fallback using only the basic string operations that are
-    # available on the RP2350 firmware.
-    words = name.replace("_", " ").replace("-", " ").split()
-    return " ".join((word[:1].upper() + word[1:].lower()) for word in words)
-
-
-def _category_name(value):
-    """Return a supported category with canonical casing.
-
-    Using a lookup also keeps metadata case-insensitive without relying on
-    CPython-only convenience methods such as ``str.title``.
-    """
-    categories = {
-        "music": "Music",
-        "games": "Games",
-        "network": "Network",
-        "graphics": "Graphics",
-        "tools": "Tools",
-        "apps": "Apps",
-        "other": "Other",
-    }
-    return categories.get(str(value).strip().lower(), "Other")
+    return name.replace("_", " ").replace("-", " ").title()
 
 
 def _parse_metadata(path):
@@ -161,7 +139,10 @@ def scan_apps():
             meta = _parse_metadata(path)
             title = meta.get("name", meta.get("title", _title_from_filename(name)))
             description = meta.get("description", meta.get("desc", "Python application"))
-            category = _category_name(meta.get("category", "Apps"))
+            category = meta.get("category", "Apps").title()
+            if category not in ("Music", "Games", "Network", "Graphics",
+                                "Tools", "Apps", "Other"):
+                category = "Other"
             apps.append({"path": path, "name": title,
                          "description": description, "category": category})
     apps.sort(key=lambda app: app["name"].lower())
@@ -231,11 +212,7 @@ class LauncherView:
         self.d = display
         try:
             display.switchPredefinedLUT("pico8")
-        except (AttributeError, ValueError, OSError):
-            # Some firmware exposes switchPredefinedLUT(), but does not ship
-            # the optional pico8 LUT file.  It then raises ENOENT.  The
-            # framebuffer is already usable with its current 16-colour LUT,
-            # so retaining that LUT is the correct fallback.
+        except (AttributeError, ValueError):
             pass
 
     def _label(self, text, width):
